@@ -1,5 +1,8 @@
 package calculator
 
+import java.util.*
+import kotlin.math.pow
+
 object CommandManager {
     var exit = false
 
@@ -49,159 +52,220 @@ object VariableManager {
     }
 }
 
-class Operation(pType: String) {
-    object Type {
-        const val ADD = '+'
-        const val SUBTRACT = '-'
-        const val MULTIPLE = '*'
-        const val DIVIDE = '/'
-        const val POWER = '^'
-//        const val LEFT_PARENTHESIS = '('
-//        const val RIGHT_PARENTHESIS = ')'
-
-        fun priority(type: Char): Int {
-            return when (type) {
-                Type.ADD,
-                Type.SUBTRACT -> 1
-                Type.MULTIPLE,
-                Type.DIVIDE -> 2
-                Type.POWER -> 3
-//                Type.LEFT_PARENTHESIS,
-//                Type.RIGHT_PARENTHESIS -> 4
-                else -> 0
-            }
-        }
-    }
-
-    private var type :Char? = null
-
-    init {
-        type = when (pType[0]) {
-            Type.SUBTRACT -> if (pType.length % 2 == 0) Type.ADD else Type.SUBTRACT
-            else -> pType[0]
-        }
-    }
-
-    operator fun compareTo(ref: Operation): Int {
-        return Type.priority(type!!) - Type.priority(ref.type!!)
-    }
-
-    fun perform(a: Int, b: Int): Int {
-        return when (type) {
-            Type.ADD -> a + b
-            Type.SUBTRACT -> a - b
-            Type.MULTIPLE -> a * b
-            Type.DIVIDE -> a / b
-            else -> 0
-        }
-    }
-}
-
 object Calculator {
-    const val ITEM_TYPE_INVALID = -1
-    const val ITEM_TYPE_NONE = 0
-    const val ITEM_TYPE_VAR = 1
-    const val ITEM_TYPE_NUM = 2
-    const val ITEM_TYPE_OPE = 3
-    const val ITEM_TYPE_LEFT_PARENTHESIS = 4
-    const val ITEM_TYPE_RIGHT_PARENTHESIS = 5
-
-    private fun detectType(input: String): Int {
-        if (Regex("""[a-zA-Z]+""").matches(input)) {
-            return ITEM_TYPE_VAR
+    open class Operator(private val priority: Int) {
+        operator fun compareTo(ref: Operator): Int {
+            return priority - ref.priority
         }
-
-        if (Regex("""[+-]?\d+""").matches(input)) {
-            return ITEM_TYPE_NUM
-        }
-
-        if (Regex("""[+-]+""").matches(input)) {
-            return ITEM_TYPE_OPE
-        }
-
-        if (input == "(") {
-            return ITEM_TYPE_LEFT_PARENTHESIS
-        }
-
-        if (input == ")") {
-            return ITEM_TYPE_RIGHT_PARENTHESIS
-        }
-
-        return ITEM_TYPE_INVALID
     }
+    class OpeAdd(): Operator(1)
+    class OpeSubtract(): Operator(1)
+    class OpeMultiple(): Operator(3)
+    class OpeDivide(): Operator(3)
+    class OpePower(): Operator(4)
+    class OpeUnaryMinus(): Operator(5)
+    class LeftParenthesis()
+    class RightParenthesis()
+    class Number(val value: Int)
+    class Variable(val name: String)
 
-    private fun validateType(prev: Int, next: Int): Boolean {
-        return when (prev) {
-            ITEM_TYPE_NONE -> when (next) {
-                ITEM_TYPE_VAR,
-                ITEM_TYPE_NUM,
-                ITEM_TYPE_LEFT_PARENTHESIS -> true
-                else -> false
-            }
-            ITEM_TYPE_VAR,
-            ITEM_TYPE_NUM -> when (next) {
-                ITEM_TYPE_OPE,
-                ITEM_TYPE_RIGHT_PARENTHESIS -> true
-                else -> false
-            }
-            ITEM_TYPE_OPE,
-            ITEM_TYPE_LEFT_PARENTHESIS-> when (next) {
-                ITEM_TYPE_VAR,
-                ITEM_TYPE_NUM,
-                ITEM_TYPE_LEFT_PARENTHESIS -> true
-                else -> false
-            }
-            ITEM_TYPE_RIGHT_PARENTHESIS -> when (next) {
-                ITEM_TYPE_OPE,
-                ITEM_TYPE_RIGHT_PARENTHESIS -> true
-                else -> false
-            }
-            else -> false
+    private fun token2Object(token: String): Any? {
+        if (Regex("""[a-zA-Z]+""").matches(token)) {
+            return Variable(token)
+        }
+
+        if (Regex("""\d+""").matches(token)) {
+            return Number(token.toInt())
+        }
+
+        return when(token) {
+            "+" -> OpeAdd()
+            "-" -> OpeSubtract()
+            "*" -> OpeMultiple()
+            "/" -> OpeDivide()
+            "^" -> OpePower()
+            "(" -> LeftParenthesis()
+            ")" -> RightParenthesis()
+            else -> null
         }
     }
 
     fun handle(exp: String): Boolean {
-        val list = exp.split(Regex("\\s+"))
+        // remove all spaces
+        var optExp = exp
+            .replace(" ", "")
+            .replace("\r", "")
+            .replace("\n", "")
+        // optimize operator
+        while (true) {
+            val tempExp = optExp
+                .replace("++", "+")
+                .replace("--", "+")
+                .replace("+-", "-")
+                .replace("-+", "-")
+            if (tempExp == optExp) {
+                break
+            }
+            optExp = tempExp
+        }
 
-        var result: Int? = null
-        var lastType = ITEM_TYPE_NONE
-        var lastOpe: Operation? = null
-        var lastValue: Int? = null
+        // extract token from expression
+        // https://stackoverflow.com/questions/3373885/splitting-a-simple-maths-expression-with-regex
+        val regex = "(?<=op)|(?=op)".replace("op", "[-+*/()^]")
+        val list = optExp
+            .split(regex.toRegex())
+            .filter { it.isNotEmpty() }
+            .toMutableList()
 
+        // convert token to object
+        val queue = ArrayDeque<Any>()
         list.forEach {
-            val type = detectType(it)
-
-            if (!validateType(lastType, type)) {
+            val obj = token2Object(it)
+            if (obj === null) {
                 return false
             }
 
-            lastType = type
-
-            when (type) {
-                ITEM_TYPE_VAR -> {
-                    lastValue = VariableManager.get(it)
-                    if (lastValue === null) {
-                        println("Unknown variable")
-                        return true
-                    }
+            if (obj is Variable) {
+                val value = VariableManager.get(obj.name)
+                if (value !== null) {
+                    queue.add(Number(value))
                 }
-                ITEM_TYPE_NUM -> lastValue = it.toInt()
-                ITEM_TYPE_OPE -> lastOpe = Operation(it)
+                else {
+                    println("Unknown variable")
+                    return true
+                }
             }
-
-            if (result === null) {
-                result = lastValue
-                lastValue = null
-            }
-
-            if (lastOpe !== null && lastValue !== null) {
-                result = lastOpe!!.perform(result!!, lastValue!!)
-                lastOpe = null
-                lastValue = null
+            else {
+                queue.add(obj)
             }
         }
 
-        println(result)
+        // process subtract or unary minus
+        val queue2 = ArrayDeque<Any>()
+        queue.forEach {
+            if (it is OpeSubtract) {
+                if (queue2.isEmpty() ||
+                    queue2.last() is Operator ||
+                    queue2.last() is LeftParenthesis) {
+                    queue2.add(OpeUnaryMinus())
+                    return@forEach
+                }
+            }
+            queue2.add(it)
+        }
+
+        // convert infix notation to RPN
+        val rpnStack = ArrayDeque<Any>()
+        val opeStack = ArrayDeque<Any>()
+        queue2.forEach {
+            when (it) {
+                is Number -> rpnStack.push(it)
+                is Operator -> {
+                    if (opeStack.isEmpty() || opeStack.peek() is LeftParenthesis) {
+                        opeStack.push(it)
+                    }
+                    else {
+                        while (opeStack.isNotEmpty()) {
+                            if (opeStack.peek() is LeftParenthesis ||
+                                it > opeStack.peek() as Operator) {
+                                break
+                            }
+                            rpnStack.push(opeStack.pop())
+                        }
+                        opeStack.push(it)
+                    }
+                }
+                is LeftParenthesis -> opeStack.push(it)
+                is RightParenthesis -> {
+                    while (opeStack.isNotEmpty()) {
+                        val item = opeStack.pop()
+                        if (item !is LeftParenthesis) {
+                            rpnStack.push(item)
+                        }
+                        else {
+                            break
+                        }
+                    }
+
+                    if (opeStack.isEmpty()) {
+                        // unbalanced brackets
+                        return false
+                    }
+                }
+            }
+        }
+
+        while (opeStack.isNotEmpty()) {
+            val ope = opeStack.pop()
+            if (ope is LeftParenthesis) {
+                // unbalanced brackets
+                return false
+            }
+            rpnStack.push(ope)
+        }
+
+        // calculate rpn
+        val resultStack = ArrayDeque<Int>()
+        while (rpnStack.isNotEmpty()) {
+            val it = rpnStack.pollLast()
+
+            when (it) {
+                is OpeAdd,
+                is OpeSubtract,
+                is OpeMultiple,
+                is OpeDivide,
+                is OpePower -> {
+                    if (resultStack.size < 2) {
+                        return false
+                    }
+                }
+                is OpeUnaryMinus -> {
+                    if (resultStack.size < 1) {
+                        return false
+                    }
+                }
+            }
+
+            when (it) {
+                is Number -> resultStack.push(it.value)
+                is OpeAdd -> {
+                    val b = resultStack.pop()
+                    val a = resultStack.pop()
+                    resultStack.push(a + b)
+                }
+                is OpeSubtract -> {
+                    val b = resultStack.pop()
+                    val a = resultStack.pop()
+                    resultStack.push(a - b)
+                }
+                is OpeMultiple -> {
+                    val b = resultStack.pop()
+                    val a = resultStack.pop()
+                    resultStack.push(a * b)
+                }
+                is OpeDivide -> {
+                    val b = resultStack.pop()
+                    val a = resultStack.pop()
+                    resultStack.push(a / b)
+                }
+                is OpePower -> {
+                    val b = resultStack.pop()
+                    val a = resultStack.pop()
+                    resultStack.push(a.toDouble().pow(b).toInt())
+                }
+                is OpeUnaryMinus -> {
+                    val a = resultStack.pop()
+                    resultStack.push(-a)
+                }
+            }
+        }
+
+        if (resultStack.size != 1) {
+            return false
+        }
+
+        println(resultStack.pop())
+
         return true
     }
 }
