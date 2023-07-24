@@ -1,7 +1,7 @@
 package calculator
 
+import java.math.BigInteger
 import java.util.*
-import kotlin.math.pow
 
 object CommandManager {
     var exit = false
@@ -19,9 +19,9 @@ object CommandManager {
 }
 
 object VariableManager {
-    private val map = mutableMapOf<String, Int>()
+    private val map = mutableMapOf<String, BigInteger>()
 
-    fun get(name: String): Int? = map[name]
+    fun get(name: String): BigInteger? = map[name]
 
     fun handle(exp: String): Boolean {
         val arr = exp.split("=")
@@ -36,7 +36,7 @@ object VariableManager {
         }
 
         if (Regex("[+-]?\\d+").matches(value)) {
-            map[name] = value.toInt()
+            map[name] = value.toBigInteger()
             return true
         }
 
@@ -58,15 +58,15 @@ object Calculator {
             return priority - ref.priority
         }
     }
-    class OpeAdd(): Operator(1)
-    class OpeSubtract(): Operator(1)
-    class OpeMultiple(): Operator(3)
-    class OpeDivide(): Operator(3)
-    class OpePower(): Operator(4)
-    class OpeUnaryMinus(): Operator(5)
-    class LeftParenthesis()
-    class RightParenthesis()
-    class Number(val value: Int)
+    class OpeAdd: Operator(1)
+    class OpeSubtract: Operator(1)
+    class OpeMultiple: Operator(3)
+    class OpeDivide: Operator(3)
+    class OpePower: Operator(4)
+    class OpeUnaryMinus: Operator(5)
+    class LeftParenthesis
+    class RightParenthesis
+    class Number(val value: BigInteger)
     class Variable(val name: String)
 
     private fun token2Object(token: String): Any? {
@@ -75,7 +75,7 @@ object Calculator {
         }
 
         if (Regex("""\d+""").matches(token)) {
-            return Number(token.toInt())
+            return Number(token.toBigInteger())
         }
 
         return when(token) {
@@ -205,7 +205,7 @@ object Calculator {
         }
 
         // calculate rpn
-        val resultStack = ArrayDeque<Int>()
+        val resultStack = ArrayDeque<BigInteger>()
         while (rpnStack.isNotEmpty()) {
             val it = rpnStack.pollLast()
 
@@ -251,7 +251,7 @@ object Calculator {
                 is OpePower -> {
                     val b = resultStack.pop()
                     val a = resultStack.pop()
-                    resultStack.push(a.toDouble().pow(b).toInt())
+                    resultStack.push(a.pow(b.toInt()))
                 }
                 is OpeUnaryMinus -> {
                     val a = resultStack.pop()
