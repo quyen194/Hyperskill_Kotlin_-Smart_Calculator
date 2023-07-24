@@ -1,0 +1,18 @@
+type: code
+files:
+- name: src/Main.kt
+  visible: true
+  text: |-
+    fun main() {
+        val text = readLine()!!
+        val regexColors = "#[0-9a-fA-F]{6}\\b".toRegex()
+        // write your code here
+    }
+  learner_created: false
+feedback_link: https://hyperskill.org/learn/step/14637#comment
+status: Solved
+feedback:
+  message: <html>Correct solution</html>
+  time: "Tue, 18 Jul 2023 08:41:36 UTC"
+record: -1
+submission_language: kotlin

@@ -1,0 +1,24 @@
+type: code
+files:
+- name: src/Main.kt
+  visible: true
+  highlight_level: NONE
+  text: |-
+    class Employee(val clothesSize: Int) {
+        class Uniform {
+            val uniformType = "suit"
+            val uniformColor = "blue"
+        }
+
+        fun printUniformInfo() {
+            //...
+        }
+    }
+  learner_created: false
+feedback_link: https://hyperskill.org/learn/step/14734#comment
+status: Solved
+feedback:
+  message: <html>Correct solution</html>
+  time: "Fri, 14 Jul 2023 09:01:51 UTC"
+record: -1
+submission_language: kotlin
